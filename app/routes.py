@@ -1,58 +1,7 @@
-from flask import Flask, jsonify, request
-from flask_cors import CORS, cross_origin
-from flask_sqlalchemy import SQLAlchemy
-from flask_marshmallow import Marshmallow
-from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
-
-
-
-app = Flask(__name__)
-CORS(app)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://USER:PASSWORD@localhost/flasktask'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False 
-
-db = SQLAlchemy(app)
-ma = Marshmallow(app)
-
-class Task(db.Model): 
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(20), unique=True)
-    description = db.Column(db.String(150))
-    urgency_id = db.Column(db.Integer, db.ForeignKey('urgency.id'))
-    date = db.Column(db.DateTime, nullable=True)
-
-
-    def __init__(self, title, description, urgency_id, date):
-        self.title = title
-        self.description = description
-        self.urgency_id = urgency_id
-        self.date = date
-
-class Urgency(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(20))
-    number = db.Column(db.Integer)
-    tasks = db.relationship('Task', backref='urgency', lazy=True)
-
-    def __init__(self, name):
-        self.name = name
-        self.number = 1
-
-db.create_all()
-
-class UrgencySchema(SQLAlchemyAutoSchema): 
-    class Meta:
-        model = Urgency
-
-class TaskSchema(ma.Schema):
-    class Meta:
-        fields = ('id', 'title', 'description', 'date', 'urgency')
-
-    urgency = ma.Nested(UrgencySchema)
-    
-
-task_schema = TaskSchema()
-tasks_schema = TaskSchema(many=True)
+from flask import jsonify, request
+from flask_cors import cross_origin
+from app import app, db
+from app.models import Task, Urgency, task_schema, tasks_schema
 
 
 @app.route('/', methods=['GET'])
@@ -90,7 +39,7 @@ def create_task():
     
     print(task_schema.jsonify(new_task))
 
-    return task_schema.jsonify(new_task)
+    return task_schema.jsonify(new_task), 201
 
 
 @app.route('/edit/<id>', methods=['PUT'])
@@ -130,7 +79,7 @@ def delete_task(id):
     db.session.delete(task_del)
     db.session.commit()
 
-    return task_schema.jsonify(task_del)
+    return task_schema.jsonify(task_del), 202
 
 if __name__ == "__main__":
     app.run(debug=True)
